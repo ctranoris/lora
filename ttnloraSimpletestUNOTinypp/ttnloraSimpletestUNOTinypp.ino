@@ -29,17 +29,17 @@
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //static const PROGMEM u1_t NWKSKEY[16] = { 0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C };
-static const PROGMEM u1_t NWKSKEY[16] = { 0x30, 0xAE, 0xCF, 0xD2, 0xE5, 0xDE, 0x07, 0xFF, 0x5A, 0xA0, 0x66, 0xA3, 0x6D, 0x28, 0x47, 0x8B };
+static const PROGMEM u1_t NWKSKEY[16] = { 0x3A, 0x57, 0x16, 0xB5, 0xC4, 0x73, 0xE4, 0x95, 0xD2, 0x60, 0xC9, 0xBD, 0xB9, 0x5E, 0x6F, 0x08 };
 
 // LoRaWAN AppSKey, application session key
 // This is the default Semtech key, which is used by the prototype TTN
 // network initially.
 //static const u1_t PROGMEM APPSKEY[16] = { 0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C };
-static const u1_t PROGMEM APPSKEY[16] = { 0x80, 0x48, 0xCA, 0xFC, 0x3F, 0x5C, 0xC1, 0xA2, 0xB5, 0xF8, 0x55, 0xF3, 0x96, 0xF2, 0xD9, 0x2A };
+static const u1_t PROGMEM APPSKEY[16] = { 0x8F, 0x90, 0xF1, 0xAC, 0x09, 0x29, 0x7E, 0x33, 0xF3, 0xD0, 0xCD, 0x56, 0xD7, 0xD5, 0x81, 0x96 };
 
 // LoRaWAN end-device address (DevAddr)
 // See http://thethingsnetwork.org/wiki/AddressSpace
-static const u4_t DEVADDR = 0x26011F1E ; // <-- Change this address for every node!
+static const u4_t DEVADDR = 0x26011609 ; // <-- Change this address for every node!
 
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
@@ -51,7 +51,10 @@ void os_getDevKey (u1_t* buf) { }
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 5; //60
+const unsigned TX_INTERVAL = 10;
+
+byte dataoutgoing[50];
+static osjob_t sendjob;
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -61,125 +64,106 @@ const lmic_pinmap lmic_pins = {
     .dio = {2, 6, 7},
 };
 
-
-#define ss Serial
-byte dataoutgoing[50];
-
-static uint8_t mydata[] = "Hello: ";
-static osjob_t sendjob;
-int counter = 100;
-
 void onEvent (ev_t ev) {
-    ss.print(os_getTime());
-    ss.print(": ");
+    Serial.print(os_getTime());
+    Serial.print(": ");
     switch(ev) {
         case EV_SCAN_TIMEOUT:
-            ss.println(F("EV_SCAN_TIMEOUT"));
+            Serial.println(F("EV_SCAN_TIMEOUT"));
             break;
         case EV_BEACON_FOUND:
-            ss.println(F("EV_BEACON_FOUND"));
+            Serial.println(F("EV_BEACON_FOUND"));
             break;
         case EV_BEACON_MISSED:
-            ss.println(F("EV_BEACON_MISSED"));
+            Serial.println(F("EV_BEACON_MISSED"));
             break;
         case EV_BEACON_TRACKED:
-            ss.println(F("EV_BEACON_TRACKED"));
+            Serial.println(F("EV_BEACON_TRACKED"));
             break;
         case EV_JOINING:
-            ss.println(F("EV_JOINING"));
+            Serial.println(F("EV_JOINING"));
             break;
         case EV_JOINED:
-            ss.println(F("EV_JOINED"));
+            Serial.println(F("EV_JOINED"));
             break;
         case EV_RFU1:
-            ss.println(F("EV_RFU1"));
+            Serial.println(F("EV_RFU1"));
             break;
         case EV_JOIN_FAILED:
-            ss.println(F("EV_JOIN_FAILED"));
+            Serial.println(F("EV_JOIN_FAILED"));
             break;
         case EV_REJOIN_FAILED:
-            ss.println(F("EV_REJOIN_FAILED"));
-            break;
+            Serial.println(F("EV_REJOIN_FAILED"));
             break;
         case EV_TXCOMPLETE:
-            ss.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
-            if(LMIC.dataLen) {
+            Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
+            if (LMIC.txrxFlags & TXRX_ACK)
+              Serial.println(F("Received ack"));
+            if (LMIC.dataLen) {
                 // data received in rx slot after tx
-                ss.print(F("---------------------------------------------Data Received: "));
-                ss.write(LMIC.frame+LMIC.dataBeg, LMIC.dataLen);
-                ss.println();
+                Serial.print(F("---------------------------------------------Data Received: "));
+                Serial.write(LMIC.frame+LMIC.dataBeg, LMIC.dataLen);
+                Serial.println();
             }
             // Schedule next transmission
             os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
             break;
         case EV_LOST_TSYNC:
-            ss.println(F("EV_LOST_TSYNC"));
+            Serial.println(F("EV_LOST_TSYNC"));
             break;
         case EV_RESET:
-            ss.println(F("EV_RESET"));
+            Serial.println(F("EV_RESET"));
             break;
         case EV_RXCOMPLETE:
             // data received in ping slot
-            ss.println(F("EV_RXCOMPLETE"));
+            Serial.println(F("EV_RXCOMPLETE"));
             break;
         case EV_LINK_DEAD:
-            ss.println(F("EV_LINK_DEAD"));
+            Serial.println(F("EV_LINK_DEAD"));
             break;
         case EV_LINK_ALIVE:
-            ss.println(F("EV_LINK_ALIVE"));
+            Serial.println(F("EV_LINK_ALIVE"));
             break;
          default:
-            ss.println(F("Unknown event"));
+            Serial.println(F("Unknown event"));
             break;
     }
 }
 
 void do_send(osjob_t* j){
 
-    bool newData = false;
-    unsigned long chars;
-    unsigned short sentences, failed;
+   String message = "HELLO";
+   message.getBytes(dataoutgoing, message.length()+1);
 
-    String message;
-     
-    ss.println("LAT = no newData.");
-    message = "HELLO";
-     
-    
-    //message = "M"+String(counter) + message;
-    message.getBytes(dataoutgoing, message.length()+1);
-    counter++;
-    if (counter>=999){
-      counter = 100;
-    }
-    
+   
     // Check if there is not a current TX/RX job running
     if (LMIC.opmode & OP_TXRXPEND) {
-        ss.println(F("OP_TXRXPEND, not sending"));
+        Serial.println(F("OP_TXRXPEND, not sending"));
     } else {
-
+        // Prepare upstream data transmission at the next possible time.
+        //LMIC_setTxData2(1, mydata, sizeof(mydata)-1, 0);
         LMIC_setTxData2(1, (uint8_t*) dataoutgoing, message.length() , 0);
-        ss.println("Sending msg: "+message);
-        ss.println(F("Packet queued: "));
+        Serial.println("Sending msg: "+message);
+        Serial.println(F("Packet queued: "));
         for (int i = 0; i < message.length(); i++) {
-                ss.print((char)dataoutgoing[i]);
+                Serial.print((char)dataoutgoing[i]);
         }
-        ss.println(F("->"));        
-      digitalWrite( 8, HIGH);
-      delay(500);              // wait for a second
-      digitalWrite( 8, LOW);      
+        Serial.println(F("->")); 
         
     }
     // Next TX is scheduled after TX_COMPLETE event.
 }
 
 void setup() {
-    pinMode( 8, OUTPUT); 
-    
-    Serial.begin(9600);    
-    ss.begin(9600);
-    ss.println(F("Starting"));
+    Serial.begin(115200);
+    Serial.println(F("Starting"));
 
+    #ifdef VCC_ENABLE
+    // For Pinoccio Scout boards
+    pinMode(VCC_ENABLE, OUTPUT);
+    digitalWrite(VCC_ENABLE, HIGH);
+    delay(1000);
+    #endif
 
     // LMIC init
     os_init();
@@ -198,10 +182,11 @@ void setup() {
     memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
     LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
     #else
-    // If not running an AVR with PROGMEM, just use the arrays directly 
+    // If not running an AVR with PROGMEM, just use the arrays directly
     LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
     #endif
 
+    #if defined(CFG_eu868)
     // Set up the channels used by the Things Network, which corresponds
     // to the defaults of most gateways. Without this, only three base
     // channels from the LoRaWAN specification are used, which certainly
@@ -210,6 +195,7 @@ void setup() {
     // your network here (unless your network autoconfigures them).
     // Setting up channels should happen after LMIC_setSession, as that
     // configures the minimal channel set.
+    // NA-US channels 0-71 are configured automatically
     LMIC_setupChannel(0, 868100000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
     LMIC_setupChannel(1, 868300000, DR_RANGE_MAP(DR_SF12, DR_SF7B), BAND_CENTI);      // g-band
     LMIC_setupChannel(2, 868500000, DR_RANGE_MAP(DR_SF12, DR_SF7),  BAND_CENTI);      // g-band
@@ -223,11 +209,21 @@ void setup() {
     // devices' ping slots. LMIC does not have an easy way to define set this
     // frequency and support for class B is spotty and untested, so this
     // frequency is not configured here.
+    #elif defined(CFG_us915)
+    // NA-US channels 0-71 are configured automatically
+    // but only one group of 8 should (a subband) should be active
+    // TTN recommends the second sub band, 1 in a zero based count.
+    // https://github.com/TheThingsNetwork/gateway-conf/blob/master/US-global_conf.json
+    LMIC_selectSubBand(1);
+    #endif
 
     // Disable link check validation
     LMIC_setLinkCheckMode(0);
 
-    // Set data rate and transmit power (note: txpow seems to be ignored by the library)
+    // TTN uses SF9 for its RX2 window.
+    LMIC.dn2Dr = DR_SF9;
+
+    // Set data rate and transmit power for uplink (note: txpow seems to be ignored by the library)
     LMIC_setDrTxpow(DR_SF7,14);
 
     // Start job
@@ -237,4 +233,3 @@ void setup() {
 void loop() {
     os_runloop_once();
 }
-
