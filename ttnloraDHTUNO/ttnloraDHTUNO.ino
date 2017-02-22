@@ -86,6 +86,12 @@ void loop()
   Serial.print("Dew PointFast (°C): ");
   Serial.println(DHT11.dewPointFast(), DEC);
 
+  int sensorReading= analogRead(A0); //reads the sensor value
+
+  Serial.println (sensorReading); //prints out the sensor reading
+
   delay(2000);
 }
+
+
 
