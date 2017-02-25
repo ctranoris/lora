@@ -3,6 +3,7 @@
 #include <hal/hal.h>
 #include <SPI.h>
 #include <dht11.h>
+#include "LowPower.h"
 
 // LoRaWAN NwkSKey, network session key
 // This is the default Semtech key, which is used by the prototype TTN
@@ -30,7 +31,11 @@ void os_getDevKey (u1_t* buf) { }
 
 // Schedule TX every this many seconds (might become longer due to duty
 // cycle limitations).
-const unsigned TX_INTERVAL = 300;
+//const unsigned TX_INTERVAL = 60*60;//every hour
+const unsigned TX_INTERVAL = 10;//every hour
+unsigned sleepcounter = 0;
+const unsigned maxsleepcounter = 225;//450* 8sec = 3600sec about every 1Hour will send values
+//will transmit after: sleep for 8second*maxsleepcounter + TX_INTERVALsec
 
 byte dataoutgoing[50];
 static osjob_t sendjob;
@@ -87,7 +92,21 @@ void onEvent (ev_t ev) {
                 Serial.println();
             }
             // Schedule next transmission
+
+             Serial.println("will power sleep");//for 8s * maxsleep
+             delay(2000);
+             while ( sleepcounter <= maxsleepcounter ){
+                
+                LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+                sleepcounter++;
+             }
+             sleepcounter = 0;
+             Serial.println("power sleep done...scheduling");
+            
+            // Schedule next transmission
             os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+
+            
             break;
         case EV_LOST_TSYNC:
             Serial.println(F("EV_LOST_TSYNC"));
@@ -113,6 +132,10 @@ void onEvent (ev_t ev) {
 
 void do_send(osjob_t* j){
 
+ 
+  
+
+  
   int chk = DHT11.read();
   Serial.print("Read sensor: ");
   switch (chk)
